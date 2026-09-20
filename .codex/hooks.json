@@ -1,0 +1,41 @@
+{
+  "description": "Keep Issue implementation test-first and give TDD context to every SubAgent.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/tdd_context.py\"",
+            "timeout": 5,
+            "statusMessage": "Loading TDD workflow"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/tdd_context.py\"",
+            "timeout": 5,
+            "statusMessage": "Loading SubAgent TDD role"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/tdd_context.py\"",
+            "timeout": 5,
+            "statusMessage": "Collecting SubAgent evidence"
+          }
+        ]
+      }
+    ]
+  }
+}
