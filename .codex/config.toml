@@ -1,0 +1,6 @@
+[agents]
+# Keep reviews and implementation coordination available in every Codex session
+# opened for this repository.
+enabled = true
+max_concurrent_threads_per_session = 3
+interrupt_message = true
