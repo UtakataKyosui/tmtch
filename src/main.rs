@@ -1,36 +1,40 @@
-use std::{path::Path};
+use std::path::Path;
 
 use clap::{Parser, Subcommand};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Parser,Debug)]
-#[command(version,about,long_about = "
+#[derive(Parser, Debug)]
+#[command(
+    version,
+    about,
+    long_about = "
 Rustで実装された、拡張子毎にテンプレートを設定可能なファイル作成ツール
 EN: A file creation tool implemented in Rust that allows setting templates for each file extension.
-")]
+"
+)]
 struct Arg {
     #[command(subcommand)]
     subcommand: Option<Commands>,
     /// The name of the file to operate on (required for the Edit command)
     name: Option<String>,
 }
-#[derive(Default,Debug,Serialize,Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 struct Config {
     templates: std::collections::HashMap<String, String>,
 }
 
-#[derive(Subcommand,Debug)]
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// Create a new file with the specified name
-   Touch,
+    Touch,
     /// Print the extension of the file
-   Edit { name: String},
-   /// List all available templates
-   List
+    Edit { name: String },
+    /// List all available templates
+    List,
 }
 
 fn main() {
-    let args = Arg::parse(); 
+    let args = Arg::parse();
 
     if let Some(subcommand) = &args.subcommand {
         match subcommand {
@@ -62,10 +66,9 @@ fn main() {
                 if let Some(file) = &args.name {
                     if let Some(help) = get_version(file) {
                         println!("Version for file {}: {}", file, help);
-                    }
-                    else if let Some(extension) = get_extension(file) {
-                         println!("File: {}", file);
-                         println!("Extension: {}", extension);
+                    } else if let Some(extension) = get_extension(file) {
+                        println!("File: {}", file);
+                        println!("Extension: {}", extension);
                     } else {
                         println!("No extension found for file: {}", file);
                     }
@@ -74,10 +77,8 @@ fn main() {
                 }
             }
         }
-        
     }
 }
-
 
 fn get_extension(file: &String) -> Option<&str> {
     let path = Path::new(file);
@@ -95,6 +96,6 @@ fn edit_template(name: &String) {
 }
 
 fn load_template() -> Result<Config, confy::ConfyError> {
-    let config: Config = confy::load("tmtch",None)?;
+    let config: Config = confy::load("tmtch", None)?;
     Ok(config)
 }
