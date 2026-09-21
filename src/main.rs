@@ -8,17 +8,19 @@ use tmtch::AppPaths;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "tmrch",
+    name = "tmtch",
     version,
-    about = "拡張子ごとのテンプレートで新規ファイルを作成する"
+    about = "テンプレートから新しいファイルを作成する CLI",
+    long_about = "拡張子に対応するテンプレートを使って、新しいファイルを作成します。\nテンプレートがない拡張子では空のファイルを作成します。",
+    after_help = "例:\n  tmtch app.rs        rs テンプレートから app.rs を作成\n  tmtch README        空の README を作成\n  tmtch --edit rs     rs テンプレートを編集\n  tmtch --list        登録済みテンプレートを一覧表示"
 )]
 #[command(group(ArgGroup::new("mode").args(["file", "edit", "list"]).required(true).multiple(false)))]
 struct Cli {
-    #[arg(value_name = "FILE")]
+    #[arg(value_name = "FILE", help = "作成するファイルのパス")]
     file: Option<PathBuf>,
-    #[arg(long, value_name = "EXTENSION")]
+    #[arg(long, value_name = "EXTENSION", help = "EXTENSION 用テンプレートを既定のエディタで開く")]
     edit: Option<String>,
-    #[arg(long)]
+    #[arg(long, help = "登録済みテンプレートを一覧表示する")]
     list: bool,
 }
 
@@ -206,6 +208,8 @@ fn parse_command(input: &str) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::CommandFactory;
+
     #[test]
     fn normalizes_extensions_and_ignores_dotfiles() {
         assert_eq!(extension_key(Path::new("Main.RS")), Some("rs".into()));
@@ -218,5 +222,16 @@ mod tests {
             parse_command("'my editor' --wait \"\" \"a\\\"b\"").unwrap(),
             vec!["my editor", "--wait", "", "a\"b"]
         );
+    }
+
+    #[test]
+    fn long_help_explains_each_mode_with_examples() {
+        let help = Cli::command().render_long_help().to_string();
+
+        assert!(help.contains("作成するファイルのパス"));
+        assert!(help.contains("テンプレートを既定のエディタで開く"));
+        assert!(help.contains("登録済みテンプレートを一覧表示する"));
+        assert!(help.contains("例:"));
+        assert!(help.contains("tmtch app.rs"));
     }
 }
