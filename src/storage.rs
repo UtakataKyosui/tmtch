@@ -100,14 +100,12 @@ impl AppPaths {
                 });
             };
             if key.trim() == "editor" {
-                let value = value.trim();
-                if !(value.starts_with('"') && value.ends_with('"')) {
-                    return Err(StorageError::InvalidConfig {
-                        path,
-                        message: "editor は文字列で指定してください".into(),
-                    });
-                }
-                config.editor = Some(value[1..value.len() - 1].into());
+                config.editor = Some(parse_toml_string(value.trim()).map_err(|message| {
+                    StorageError::InvalidConfig {
+                        path: path.clone(),
+                        message,
+                    }
+                })?);
             }
         }
         Ok(config)
@@ -118,10 +116,65 @@ impl AppPaths {
         let contents = config
             .editor
             .as_ref()
-            .map(|editor| format!("editor = \"{editor}\"\n"))
+            .map(|editor| {
+                format!(
+                    "editor = \"{}\"\n",
+                    editor
+                        .replace('\\', "\\\\")
+                        .replace('"', "\\\"")
+                        .replace('\n', "\\n")
+                )
+            })
             .unwrap_or_default();
         fs::write(&path, contents).map_err(|source| StorageError::Io { path, source })
     }
+}
+
+fn parse_toml_string(value: &str) -> Result<String, String> {
+    let Some(quote) = value.chars().next() else {
+        return Err("editor は文字列で指定してください".into());
+    };
+    if quote == '\'' {
+        let Some(end) = value[1..].find('\'') else {
+            return Err("editor の文字列が閉じられていません".into());
+        };
+        let end = end + 1;
+        if !value[end + 1..].trim_start().is_empty()
+            && !value[end + 1..].trim_start().starts_with('#')
+        {
+            return Err("editor の後ろに無効な値があります".into());
+        }
+        return Ok(value[1..end].into());
+    }
+    if quote != '"' {
+        return Err("editor は文字列で指定してください".into());
+    }
+    let mut output = String::new();
+    let mut escaped = false;
+    for (offset, character) in value[1..].char_indices() {
+        if escaped {
+            output.push(match character {
+                '"' => '"',
+                '\\' => '\\',
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                _ => return Err("editor に未対応のエスケープがあります".into()),
+            });
+            escaped = false;
+        } else if character == '\\' {
+            escaped = true;
+        } else if character == '"' {
+            let remaining = &value[offset + 2..];
+            if !remaining.trim_start().is_empty() && !remaining.trim_start().starts_with('#') {
+                return Err("editor の後ろに無効な値があります".into());
+            }
+            return Ok(output);
+        } else {
+            output.push(character);
+        }
+    }
+    Err("editor の文字列が閉じられていません".into())
 }
 
 #[cfg(test)]
@@ -167,6 +220,38 @@ mod tests {
         paths.initialize().unwrap();
         assert!(paths.templates_dir().is_dir());
         assert!(!root.join("tmtch").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn malformed_editor_string_returns_an_error() {
+        let root = temp_root("malformed-editor");
+        let paths = AppPaths::from_config_root(&root);
+        fs::create_dir_all(paths.root()).unwrap();
+        fs::write(paths.config_file(), "editor = \"\n").unwrap();
+
+        assert!(matches!(
+            paths.load_config(),
+            Err(super::StorageError::InvalidConfig { .. })
+        ));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn editor_config_supports_escapes_comments_and_literal_strings() {
+        let root = temp_root("editor-config");
+        let paths = AppPaths::from_config_root(&root);
+        fs::create_dir_all(paths.root()).unwrap();
+        fs::write(
+            paths.config_file(),
+            "editor = \"code \\\"quoted\\\" --wait\" # comment\n",
+        )
+        .unwrap();
+
+        assert_eq!(
+            paths.load_config().unwrap().editor.as_deref(),
+            Some("code \"quoted\" --wait")
+        );
         let _ = fs::remove_dir_all(root);
     }
 }
